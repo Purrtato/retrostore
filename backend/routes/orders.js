@@ -1,10 +1,11 @@
 import { Router } from 'express'
 import { pool } from '../db/pool.js'
+import { requireAdmin } from '../middleware/requireAdmin.js'
 
 const router = Router()
 
 // GET /orders, alla ordrar med orderrader, senaste först
-router.get('/', async (req, res) => {
+router.get('/', requireAdmin, async (req, res) => {
   try {
     const ordersResult = await pool.query(
       'SELECT * FROM orders ORDER BY created_at DESC'

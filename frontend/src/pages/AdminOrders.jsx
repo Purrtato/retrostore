@@ -1,21 +1,26 @@
 import { useState, useEffect } from 'react'
-import { API_URL } from '../config'
+import { api } from '../api'
 
 function AdminOrders() {
   // Listan med alla ordrar, hämtade från backend
   const [orders, setOrders] = useState([])
+  // Felmeddelande att visa om hämtningen misslyckas (t.ex. 401 om sessionen gått ut)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    fetch(`${API_URL}/orders`)
-      .then(res => res.json())
+    // api() skickar med session-cookien och kastar ett fel om servern svarar med t.ex. 401
+    api('/orders')
       .then(data => setOrders(data))
-      .catch(err => console.error(err))
+      .catch(err => setError(err.message))
   }, [])
 
-    return (
+  return (
     <div className="min-h-screen bg-slate-900 p-6">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl font-bold text-white mb-6">Admin - Ordrar</h1>
+
+        {/* Visa felet i stället för att krascha */}
+        {error && <p className="text-red-400 mb-4">{error}</p>}
 
         <ul className="space-y-3">
           {orders.map(order => (
