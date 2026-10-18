@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { pool } from '../db/pool.js'
+import { requireAdmin } from '../middleware/requireAdmin.js'
 
 const router = Router()
 
@@ -36,7 +37,7 @@ router.get('/:id', async (req, res) => {
 })
 
 // POST /products, skapa produkt
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   try {
     const { name, description, price, category, stock, image_url } = req.body
 
@@ -55,7 +56,7 @@ router.post('/', async (req, res) => {
 })
 
 // PUT /products/:id, uppdatera produkt
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAdmin, async (req, res) => {
   try {
     const { name, description, price, category, stock, image_url } = req.body
 
@@ -79,7 +80,7 @@ router.put('/:id', async (req, res) => {
 })
 
 // DELETE /products/:id, "mjuk" borttagning (is_active = false)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE products SET is_active = false WHERE id = $1 RETURNING *`,
