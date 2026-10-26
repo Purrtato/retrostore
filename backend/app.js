@@ -6,6 +6,8 @@ import { pool } from './db/pool.js'
 import authRouter from './routes/auth.js'
 import productsRouter from './routes/products.js'
 import ordersRouter from './routes/orders.js'
+import { requireAdmin } from './middleware/requireAdmin.js'
+import adminImportRouter from './routes/admin/import.js'
 
 const app = express()
 const isProd = process.env.NODE_ENV === 'production'
@@ -44,5 +46,6 @@ app.get('/', (req, res) => {
 app.use('/auth', authRouter)
 app.use('/products', productsRouter)
 app.use('/orders', ordersRouter)
+app.use('/admin', requireAdmin, adminImportRouter)
 
 export default app
