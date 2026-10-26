@@ -28,6 +28,9 @@ function Navbar() {
         <Link to="/" className="text-slate-300 hover:text-emerald-400 transition-colors">
           Produkter
         </Link>
+        <Link to="/search" className="text-slate-300 hover:text-emerald-400 transition-colors">
+          Sök
+        </Link>
         <Link to="/cart" className="text-slate-300 hover:text-emerald-400 transition-colors">
           Varukorg {itemCount > 0 && <span className="text-emerald-400 font-semibold">({itemCount})</span>}
         </Link>

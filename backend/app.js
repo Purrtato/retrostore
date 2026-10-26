@@ -1,3 +1,5 @@
+import searchRouter from './routes/search.js'
+import adminSearchRouter from './routes/admin/search.js'
 import express from 'express'
 import cors from 'cors'
 import session from 'express-session'
@@ -46,6 +48,9 @@ app.get('/', (req, res) => {
 app.use('/auth', authRouter)
 app.use('/products', productsRouter)
 app.use('/orders', ordersRouter)
+app.use('/api/search', searchRouter)
+app.use('/api/search', searchRouter)
 app.use('/admin', requireAdmin, adminImportRouter)
+app.use('/admin', requireAdmin, adminSearchRouter)
 
 export default app

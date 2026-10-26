@@ -1,7 +1,9 @@
 import { pool } from '../db/pool.js'
 import { fetchSupplierProducts } from '../integrations/supplierAdapter.js'
+import { syncProducts } from './searchIndexService.js'
 
 // Upsert: skapar produkten, eller uppdaterar den om artikelnumret redan finns.
+// Beskrivning och bild rörs aldrig vid uppdatering, och is_active inte heller.
 const UPSERT_SQL = `
   INSERT INTO products
     (article_number, name, description, price, category, stock, image_url, ean, variants, is_active)
@@ -15,13 +17,12 @@ const UPSERT_SQL = `
     variants = EXCLUDED.variants
 `
 
-export async function importProducts(format) {
-  // Hämtning och validering sker före transaktionen, så att ett leverantörsfel aldrig kan ge en halv import
-  const { products, skipped } = await fetchSupplierProducts(format)
-
+// Sparar alla produkter i en transaktion
+async function saveInTransaction(products) {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+
     const existing = await client.query(
       'SELECT article_number FROM products WHERE article_number = ANY($1)',
       [products.map(p => p.article_number)]
@@ -41,11 +42,28 @@ export async function importProducts(format) {
     }
 
     await client.query('COMMIT')
-    return { created, updated, skipped }
+    return { created, updated }
   } catch (err) {
-    await client.query('ROLLBACK') // något gick fel: ångra allt
+    await client.query('ROLLBACK')
     throw err
   } finally {
-    client.release() // lämna tillbaka anslutningen till poolen
+    client.release()
   }
+}
+
+export async function importProducts(format) {
+  // 1. Hämta och validera
+  const { products, skipped } = await fetchSupplierProducts(format)
+
+  // 2. Spara i databasen
+  const { created, updated } = await saveInTransaction(products)
+
+  // 3. Först därefter, uppdatera sökindexet. Misslyckas det är importen ändå sparad
+  const { rows } = await pool.query(
+    'SELECT * FROM products WHERE article_number = ANY($1)',
+    [products.map(p => p.article_number)]
+  )
+  const searchIndex = await syncProducts(rows)
+
+  return { created, updated, skipped, searchIndex }
 }
