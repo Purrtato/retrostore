@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api' // ersätter API_URL, api() lägger till adressen och skickar med cookien
+import ImportPanel from '../components/ImportPanel'
 
 function AdminProducts() {
   // Listan med alla produkter, hämtade från backend
@@ -97,7 +98,7 @@ function AdminProducts() {
 
         {/* Visar felmeddelandet om något gick fel */}
         {error && <p className="text-red-400 mb-4">{error}</p>}
-
+        <ImportPanel onDone={fetchProducts} />
         <div className="grid md:grid-cols-2 gap-8 min-w-0">
 
           {/* Vänster kolumn, formuläret */}
