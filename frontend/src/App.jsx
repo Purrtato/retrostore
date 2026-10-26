@@ -8,6 +8,7 @@ import OrderConfirmation from './pages/OrderConfirmation'
 import AdminOrders from './pages/AdminOrders'
 import AdminLogin from './pages/AdminLogin'
 import ProtectedRoute from './components/ProtectedRoute'
+import Search from './pages/Search'
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         {/* Kundsidor, öppna för alla */}
         <Route path="/" element={<ProductList />} />
         <Route path="/cart" element={<Cart />} />
+        <Route path="/search" element={<Search />} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/order-confirmation" element={<OrderConfirmation />} />
 

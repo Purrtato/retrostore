@@ -17,6 +17,9 @@ function AdminProducts() {
   // Felmeddelande att visa om ett anrop misslyckas (t.ex. 401 om du blivit utloggad)
   const [error, setError] = useState('')
 
+  // Varning om produkten sparades men sökindexet inte kunde uppdateras
+  const [warning, setWarning] = useState('')
+
   // Körs en gång när komponenten laddas första gången
   // Hämtar produktlistan direkt när admin-sidan öppnas
   useEffect(() => {
@@ -48,18 +51,20 @@ function AdminProducts() {
   async function handleSubmit(e) {
     e.preventDefault() // stoppar sidan från att ladda om
     setError('')       // rensa ett gammalt felmeddelande
+    setWarning('')     // rensa en gammal varning
 
     // Väljer sökväg och metod beroende på om vi skapar (POST) eller redigerar (PUT)
     const path = editingId ? `/products/${editingId}` : '/products'
     const method = editingId ? 'PUT' : 'POST'
 
     try {
-      // body skickas som ett vanligt objekt, api() gör själv JSON.stringify
-      await api(path, { method, body: formData })
+      // Servern svarar med den sparade produkten. Om sökindexet inte kunde uppdateras
+      // finns också fältet searchIndexWarning i svaret.
+      const saved = await api(path, { method, body: formData })
+      setWarning(saved?.searchIndexWarning || '')
       resetForm()      // Töm formuläret
       fetchProducts()  // Hämta uppdaterad lista, så ändringen syns direkt
     } catch (err) {
-      // Utan det här skulle ett 401 se ut som att "ingenting hände"
       setError(err.message)
     }
   }
@@ -82,9 +87,11 @@ function AdminProducts() {
   async function handleDelete(id) {
     if (!confirm('Ta bort produkten?')) return // Avbryt om man klickar "Avbryt" i rutan
     setError('')
+    setWarning('')
 
     try {
-      await api(`/products/${id}`, { method: 'DELETE' })
+      const deleted = await api(`/products/${id}`, { method: 'DELETE' })
+      setWarning(deleted?.searchIndexWarning || '')
       fetchProducts() // Hämta uppdaterad lista (produkten är nu is_active=false)
     } catch (err) {
       setError(err.message)
@@ -98,6 +105,7 @@ function AdminProducts() {
 
         {/* Visar felmeddelandet om något gick fel */}
         {error && <p className="text-red-400 mb-4">{error}</p>}
+        {warning && <p className="text-amber-400 mb-4">{warning}</p>}
         <ImportPanel onDone={fetchProducts} />
         <div className="grid md:grid-cols-2 gap-8 min-w-0">
 
