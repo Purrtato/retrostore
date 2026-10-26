@@ -1,3 +1,4 @@
+import { syncProducts } from '../services/searchIndexService.js'
 import { Router } from 'express'
 import { pool } from '../db/pool.js'
 import { requireAdmin } from '../middleware/requireAdmin.js'
@@ -47,8 +48,12 @@ router.post('/', requireAdmin, async (req, res) => {
        RETURNING *`,
       [name, description, price, category, stock, image_url]
     )
+    const product = result.rows[0]
 
-    res.status(201).json(result.rows[0])
+    // Databasen är sparad. Nu uppdaterar vi sökindexet. Misslyckas det finns produkten kvar
+    // och admin får en varning i svaret.
+    const searchIndex = await syncProducts([product])
+    res.status(201).json({ ...product, searchIndexWarning: searchIndex.warning })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Kunde inte skapa produkten' })
@@ -72,7 +77,8 @@ router.put('/:id', requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Produkten hittades inte' })
     }
 
-    res.json(result.rows[0])
+    const searchIndex = await syncProducts([result.rows[0]])
+    res.json({ ...result.rows[0], searchIndexWarning: searchIndex.warning })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Kunde inte uppdatera produkten' })
@@ -91,7 +97,13 @@ router.delete('/:id', requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Produkten hittades inte' })
     }
 
-    res.json({ message: 'Produkten togs bort', product: result.rows[0] })
+    // syncProducts ser att produkten är inaktiv och tar bort den ur sökindexet
+    const searchIndex = await syncProducts([result.rows[0]])
+    res.json({
+      message: 'Produkten togs bort',
+      product: result.rows[0],
+      searchIndexWarning: searchIndex.warning
+    })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Kunde inte ta bort produkten' })
