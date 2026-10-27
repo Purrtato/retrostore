@@ -1,12 +1,32 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 
-// Skapar innehållet som alla komponenter kan hämta varukorgen ur utan att den behöver skickas manuellt genom varje mellanliggande komponent
 const CartContext = createContext()
 
-// CartProvider håller själva datan och delar ut den till allt som ligger "inuti" den
+// Nyckeln varukorgen sparas under i webbläsaren
+const CART_KEY = 'retrostore-cart'
+
+// Läser den sparade varukorgen. Är något trasigt eller saknas börjar vi med en tom korg.
+function loadCart() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CART_KEY))
+    return Array.isArray(saved) ? saved : []
+  } catch {
+    return []
+  }
+}
+
 export function CartProvider({ children }) {
-  // En array med produkter som lagts till
-  const [cart, setCart] = useState([])
+  // Funktionen som skickas till useState körs bara första gången, så vi läser inte localStorage vid varje rendering
+  const [cart, setCart] = useState(loadCart)
+
+  // Sparar varukorgen varje gång den ändras, så att den överlever att kunden besöker Stripe och kommer tillbaka
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_KEY, JSON.stringify(cart))
+    } catch {
+      // Lagringen kan vara avstängd eller full. Då fungerar korgen som förut, utan att sparas.
+    }
+  }, [cart])
 
   // Lägger till en produkt i varukorgen
   function addToCart(product) {
