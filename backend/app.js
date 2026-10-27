@@ -1,3 +1,5 @@
+import webhooksRouter from './routes/webhooks.js'
+import checkoutRouter from './routes/checkout.js'
 import searchRouter from './routes/search.js'
 import adminSearchRouter from './routes/admin/search.js'
 import express from 'express'
@@ -17,6 +19,8 @@ const isProd = process.env.NODE_ENV === 'production'
 // Render ligger bakom en proxy. Utan detta tror Express att anropet är http
 // och skickar aldrig ut "secure"-cookien.
 app.set('trust proxy', 1)
+
+app.use('/webhooks', webhooksRouter)
 
 // credentials: true krävs för att webbläsaren ska få skicka cookies till API:et,
 // och då måste origin vara en exakt adress (inte *)
@@ -52,5 +56,6 @@ app.use('/api/search', searchRouter)
 app.use('/api/search', searchRouter)
 app.use('/admin', requireAdmin, adminImportRouter)
 app.use('/admin', requireAdmin, adminSearchRouter)
+app.use('/api/checkout', checkoutRouter)
 
 export default app
