@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api' // ersätter API_URL, api() lägger till adressen och skickar med cookien
 import ImportPanel from '../components/ImportPanel'
+import ProductImageUpload from '../components/ProductImageUpload'
 
 function AdminProducts() {
   // Listan med alla produkter, hämtade från backend
   const [products, setProducts] = useState([])
 
-  // Håller värdena i formuläret just nu
+  // Håller värdena i formuläret just nu (bilden hanteras separat via uppladdningen)
   const [formData, setFormData] = useState({
-    name: '', description: '', price: '', category: '', stock: '', image_url: ''
+    name: '', description: '', price: '', category: '', stock: ''
   })
 
   // Vi skapar en ny produkt (null) eller redigerar en befintlig (id)
@@ -43,7 +44,7 @@ function AdminProducts() {
 
   // Nollställer formuläret och avslutar ev. redigeringsläge
   function resetForm() {
-    setFormData({ name: '', description: '', price: '', category: '', stock: '', image_url: '' })
+    setFormData({ name: '', description: '', price: '', category: '', stock: '' })
     setEditingId(null)
   }
 
@@ -77,8 +78,7 @@ function AdminProducts() {
       description: product.description,
       price: product.price,
       category: product.category,
-      stock: product.stock,
-      image_url: product.image_url
+      stock: product.stock
     })
     setEditingId(product.id) // "Kom ihåg" vilken produkt vi redigerar
   }
@@ -97,6 +97,9 @@ function AdminProducts() {
       setError(err.message)
     }
   }
+
+  // Produkten som redigeras just nu (om någon). Används för att visa bilduppladdningen.
+  const editingProduct = editingId ? products.find(p => p.id === editingId) : null
 
   return (
     <div className="min-h-screen bg-slate-900 p-6">
@@ -154,13 +157,6 @@ function AdminProducts() {
                 placeholder="Lagerantal"
                 className="bg-slate-800 border border-slate-700 text-white placeholder-slate-500 p-3 rounded-lg w-full focus:border-emerald-400 focus:outline-none"
               />
-              <input
-                name="image_url"
-                value={formData.image_url}
-                onChange={handleChange}
-                placeholder="Bild-URL"
-                className="bg-slate-800 border border-slate-700 text-white placeholder-slate-500 p-3 rounded-lg w-full focus:border-emerald-400 focus:outline-none"
-              />
 
               <div className="flex gap-2">
                 <button
@@ -180,6 +176,20 @@ function AdminProducts() {
                 )}
               </div>
             </form>
+
+            {/* Bilden laddas upp för en befintlig produkt, så den visas när man redigerar.
+                key gör att uppladdningen nollställs när man byter produkt. */}
+            {editingProduct ? (
+              <ProductImageUpload
+                key={editingProduct.id}
+                product={editingProduct}
+                onDone={fetchProducts}
+              />
+            ) : (
+              <p className="text-slate-500 text-sm mt-4 max-w-sm">
+                Skapa produkten först och klicka sedan på "Redigera" för att lägga till en bild.
+              </p>
+            )}
           </div>
 
           {/* Höger kolumn, produktlistan */}

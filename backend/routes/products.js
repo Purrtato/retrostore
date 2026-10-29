@@ -37,21 +37,19 @@ router.get('/:id', async (req, res) => {
   }
 })
 
-// POST /products, skapa produkt
+// POST /products, skapa produkt (bilden läggs till efteråt via uppladdningen)
 router.post('/', requireAdmin, async (req, res) => {
   try {
-    const { name, description, price, category, stock, image_url } = req.body
+    const { name, description, price, category, stock } = req.body
 
     const result = await pool.query(
       `INSERT INTO products (name, description, price, category, stock, image_url, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, true)
+       VALUES ($1, $2, $3, $4, $5, '', true)
        RETURNING *`,
-      [name, description, price, category, stock, image_url]
+      [name, description, price, category, stock]
     )
     const product = result.rows[0]
 
-    // Databasen är sparad. Nu uppdaterar vi sökindexet. Misslyckas det finns produkten kvar
-    // och admin får en varning i svaret.
     const searchIndex = await syncProducts([product])
     res.status(201).json({ ...product, searchIndexWarning: searchIndex.warning })
   } catch (err) {
@@ -60,17 +58,17 @@ router.post('/', requireAdmin, async (req, res) => {
   }
 })
 
-// PUT /products/:id, uppdatera produkt
+// PUT /products/:id, uppdatera produkt. image_url och image_path rörs inte här.
 router.put('/:id', requireAdmin, async (req, res) => {
   try {
-    const { name, description, price, category, stock, image_url } = req.body
+    const { name, description, price, category, stock } = req.body
 
     const result = await pool.query(
       `UPDATE products
-       SET name = $1, description = $2, price = $3, category = $4, stock = $5, image_url = $6
-       WHERE id = $7
+       SET name = $1, description = $2, price = $3, category = $4, stock = $5
+       WHERE id = $6
        RETURNING *`,
-      [name, description, price, category, stock, image_url, req.params.id]
+      [name, description, price, category, stock, req.params.id]
     )
 
     if (!result.rows[0]) {
