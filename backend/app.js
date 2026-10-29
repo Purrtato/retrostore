@@ -12,6 +12,7 @@ import productsRouter from './routes/products.js'
 import ordersRouter from './routes/orders.js'
 import { requireAdmin } from './middleware/requireAdmin.js'
 import adminImportRouter from './routes/admin/import.js'
+import adminProductImagesRouter from './routes/admin/productImages.js'
 
 const app = express()
 const isProd = process.env.NODE_ENV === 'production'
@@ -56,6 +57,7 @@ app.use('/api/search', searchRouter)
 app.use('/api/search', searchRouter)
 app.use('/admin', requireAdmin, adminImportRouter)
 app.use('/admin', requireAdmin, adminSearchRouter)
+app.use('/admin', requireAdmin, adminProductImagesRouter)
 app.use('/api/checkout', checkoutRouter)
 
 export default app

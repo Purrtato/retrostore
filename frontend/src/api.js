@@ -2,11 +2,15 @@ import { API_URL } from './config'
 
 // Alla anrop till vårt API går via den här funktionen.
 export async function api(path, options = {}) {
+  const isForm = options.body instanceof FormData
+
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     credentials: 'include', // skickar och tar emot session-cookien
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-    body: options.body ? JSON.stringify(options.body) : undefined
+    headers: isForm
+      ? { ...options.headers }
+      : { 'Content-Type': 'application/json', ...options.headers },
+    body: options.body ? (isForm ? options.body : JSON.stringify(options.body)) : undefined
   })
 
   const data = await res.json().catch(() => null)
