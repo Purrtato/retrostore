@@ -1,6 +1,5 @@
 import Stripe from 'stripe'
 import { z } from 'zod'
-
 export class PaymentError extends Error {
   constructor(message, status = 502) {
     super(message)
@@ -14,49 +13,60 @@ function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) {
     throw new PaymentError('Betalningen är inte konfigurerad på servern', 500)
   }
+  // Skapas första gången den behövs. timeout = avbryt efter 10 sekunder
   stripeClient ??= new Stripe(process.env.STRIPE_SECRET_KEY, { timeout: 10000, maxNetworkRetries: 1 })
   return stripeClient
 }
 
-
-//Priserna kommer alltid från databasen
-export async function createCheckoutSession({ orderId, customerEmail, lines }) {
+export async function createCheckoutSession({ orderId, customerEmail, lines, shipping }) {
   const clientUrl = process.env.CLIENT_URL
   if (!clientUrl) throw new PaymentError('Betalningen är inte konfigurerad på servern', 500)
+
+  const lineItems = lines.map(line => ({
+    quantity: line.quantity,
+    price_data: {
+      currency: 'sek',
+      unit_amount: line.unitAmountOre, // Stripe räknar i ören
+      product_data: { name: line.name }
+    }
+  }))
+
+  // Frakten ingår i beloppet som en egen rad, så att Stripe visar varor plus frakt
+  if (shipping && shipping.amountOre > 0) {
+    lineItems.push({
+      quantity: 1,
+      price_data: {
+        currency: 'sek',
+        unit_amount: shipping.amountOre,
+        product_data: { name: shipping.label }
+      }
+    })
+  }
 
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: 'payment',
       client_reference_id: String(orderId), // orderns id följer med betalningen
       customer_email: customerEmail,
-      line_items: lines.map(line => ({
-        quantity: line.quantity,
-        price_data: {
-          currency: 'sek',
-          unit_amount: line.unitAmountOre,
-          product_data: { name: line.name }
-        }
-      })),
-      // {CHECKOUT_SESSION_ID} ersätts av Stripe med sessionens id när kunden skickas tillbaka
+      line_items: lineItems,
       success_url: `${clientUrl}/order-confirmation?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${clientUrl}/cart`,
-      // Sessionen löper ut efter 30 minuter
+      // Sessionen löper ut efter 30 minuter. Då kommer checkout.session.expired
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60
     })
     return { id: session.id, url: session.url }
   } catch (err) {
-    // Detaljer loggas bara på servern
+    // Detaljer loggas bara på servern. Kunden ser ett begripligt meddelande, och ordern förblir obetald
     console.error('Stripe-fel vid skapande av session:', err.type, err.message)
     if (err instanceof PaymentError) throw err
     throw new PaymentError('Betaltjänsten svarar inte just nu, försök igen om en stund', 502)
   }
 }
 
-// Stripe skickar orderns id som text
+// Stripe skickar orderns id som text. Kontrollerar att det ser ut som ett heltal innan det används
 const orderIdSchema = z.string().regex(/^\d+$/)
 
-// Verifierar signaturen och översätter Stripes händelse till vårt eget format:
-// PaymentError (400) om signaturen inte är giltig.
+// Verifierar signaturen och översätter Stripes händelse till eget format
 export function parseWebhook(rawBody, signature) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET
   if (!secret) throw new PaymentError('Webhooken är inte konfigurerad på servern', 500)
@@ -84,7 +94,7 @@ export function parseWebhook(rawBody, signature) {
   if (event.type === 'checkout.session.expired') {
     return { kind: 'expired', orderId }
   }
-  // completed: räknas som betald först när Stripe säger att pengarna är dragna
+  // completed, räknas som betald först när Stripe säger att pengarna är dragna
   if (session.payment_status === 'paid') {
     return { kind: 'paid', orderId }
   }
