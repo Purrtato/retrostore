@@ -1,18 +1,29 @@
+import { useEffect } from 'react'
 import { useCart } from '../context/CartContext'
 import { Link } from 'react-router-dom'
 
 function Cart() {
   // Hämtar varukorgens innehåll och funktionerna från Context
-  const { cart, removeFromCart, updateQuantity } = useCart()
+  const { cart, notices, removeFromCart, updateQuantity, refreshStock } = useCart()
+
+  // Kontrollerar saldot mot servern när varukorgen öppnas
+  useEffect(() => {
+    refreshStock()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Räknar ut totalsumman genom att summera pris * antal för varje rad
-  // reduce "vandrar igenom" hela listan och bygger upp ett enda värde (summan)
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const total = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0)
 
-    return (
+  return (
     <div className="min-h-screen bg-slate-900 p-6">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl font-bold text-white mb-6">Varukorg</h1>
+
+        {/* Förklarar ändringar som gjorts, t.ex. att en vara tagits bort för att den är slut */}
+        {notices.map(notice => (
+          <p key={notice} className="text-amber-400 mb-3">{notice}</p>
+        ))}
 
         {cart.length === 0 ? (
           <p className="text-slate-400">Din varukorg är tom.</p>) : (
@@ -20,39 +31,51 @@ function Cart() {
 
             {/* Vänster kolumn, varorna */}
             <ul className="space-y-3">
-              {cart.map(item => (
-                <li
-                  key={item.id}
-                  className="bg-slate-800 border border-slate-700 p-4 rounded-xl"
-                >
-                  <span className="text-white block mb-2">{item.name}</span>
+              {cart.map(item => {
+                // Har antalet nått lagersaldot går det inte att öka mer
+                const maxReached = item.quantity >= Number(item.stock)
 
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        className="bg-slate-700 text-white w-7 h-7 rounded-md hover:bg-slate-600">
-                        -
-                      </button>
-                      <span className="text-white w-4 text-center">{item.quantity}</span>
-                      <button
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        className="bg-slate-700 text-white w-7 h-7 rounded-md hover:bg-slate-600">
-                        +
-                      </button>
+                return (
+                  <li
+                    key={item.id}
+                    className="bg-slate-800 border border-slate-700 p-4 rounded-xl"
+                  >
+                    <span className="text-white block mb-2">{item.name}</span>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          disabled={item.quantity <= 1}
+                          className="bg-slate-700 text-white w-7 h-7 rounded-md hover:bg-slate-600 disabled:opacity-40">
+                          -
+                        </button>
+                        <span className="text-white w-4 text-center">{item.quantity}</span>
+                        <button
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          disabled={maxReached}
+                          className="bg-slate-700 text-white w-7 h-7 rounded-md hover:bg-slate-600 disabled:opacity-40">
+                          +
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className="text-emerald-400 font-semibold whitespace-nowrap">{Number(item.price) * item.quantity} kr</span>
+                        <button
+                          onClick={() => removeFromCart(item.id)}
+                          className="text-red-400 hover:text-red-300 text-sm">
+                          Ta bort
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className="text-emerald-400 font-semibold whitespace-nowrap">{item.price * item.quantity} kr</span>
-                      <button
-                        onClick={() => removeFromCart(item.id)}
-                        className="text-red-400 hover:text-red-300 text-sm">
-                        Ta bort
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
+                    {/* Förklarar varför plus-knappen är avstängd */}
+                    {maxReached && (
+                      <p className="text-xs text-slate-500 mt-2">Max antal, det finns {item.stock} i lager.</p>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
 
             {/* Höger kolumn, sammanfattning */}
@@ -72,9 +95,10 @@ function Cart() {
               </div>
 
               <div className="border-t border-slate-700 pt-3 flex justify-between mb-5">
-                <span className="text-white font-semibold">Totalt</span>
+                <span className="text-white font-semibold">Varor</span>
                 <span className="text-emerald-400 font-bold text-lg">{total} kr</span>
               </div>
+              <p className="text-xs text-slate-500 mb-4">Frakt läggs till i kassan.</p>
 
               <Link
                 to="/checkout"

@@ -28,7 +28,12 @@ function AdminOrders() {
               <p className="font-semibold text-white">Order #{order.id} - {order.customer_name}</p>
               <p className="text-sm text-slate-400">{order.customer_email}</p>
               <p className="text-sm text-emerald-400 mb-2">Status: {order.status}</p>
-
+              {order.shipping_option && (
+                <p className="text-sm text-slate-400 mb-2">
+                  Frakt: {order.shipping_option === 'pickup' ? 'Ombud' : 'Hemleverans'} ({Number(order.shipping_price)} kr)
+                  {order.service_point_name && ` – ${order.service_point_name}, ${order.service_point_address}`}
+                </p>
+              )}
               <ul className="text-sm text-slate-300 ml-4 mb-2 list-disc space-y-1">
                 {order.items.map((item, index) => (
                   <li key={index}>

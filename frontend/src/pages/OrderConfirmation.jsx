@@ -116,7 +116,18 @@ function OrderConfirmation() {
             </li>
           ))}
         </ul>
-
+        {/* Frakt och valt ombud sparas på ordern, och visas här */}
+        {order.shipping_option && (
+          <div className="text-sm text-slate-300 mb-4">
+            <p>
+              Frakt: {order.shipping_option === 'pickup' ? 'Ombud' : 'Hemleverans'}
+              {' – '}{order.shipping_price === 0 ? 'Gratis' : `${order.shipping_price} kr`}
+            </p>
+            {order.service_point_name && (
+              <p>Ombud: {order.service_point_name}, {order.service_point_address}</p>
+            )}
+          </div>
+        )}
         <p className="text-lg font-bold text-white mb-5">Totalt: {order.total} kr</p>
 
         <Link to="/" className="text-emerald-400 hover:underline">Tillbaka till produkter</Link>
