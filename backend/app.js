@@ -1,3 +1,4 @@
+import shippingRouter from './routes/shipping.js'
 import webhooksRouter from './routes/webhooks.js'
 import checkoutRouter from './routes/checkout.js'
 import searchRouter from './routes/search.js'
@@ -59,5 +60,6 @@ app.use('/admin', requireAdmin, adminImportRouter)
 app.use('/admin', requireAdmin, adminSearchRouter)
 app.use('/admin', requireAdmin, adminProductImagesRouter)
 app.use('/api/checkout', checkoutRouter)
+app.use('/api/shipping', shippingRouter)
 
 export default app
