@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
+import { useCustomer } from '../context/CustomerContext'
 
 function Navbar() {
   // Hämtar varukorgen för att kunna visa antal varor i menyn
@@ -10,6 +11,8 @@ function Navbar() {
   const { isAdmin, logout } = useAuth()
   const navigate = useNavigate()
 
+  const { customer, logout: customerLogout } = useCustomer()
+
   // Räknar ihop totalt antal varor
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0)
 
@@ -18,6 +21,11 @@ function Navbar() {
     await logout()
     navigate('/')
   }
+
+  async function handleCustomerLogout() {
+  await customerLogout()
+  navigate('/')
+}
 
   return (
     <nav className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 bg-slate-950 border-b border-slate-800">
@@ -34,6 +42,20 @@ function Navbar() {
         <Link to="/cart" className="text-slate-300 hover:text-emerald-400 transition-colors">
           Varukorg {itemCount > 0 && <span className="text-emerald-400 font-semibold">({itemCount})</span>}
         </Link>
+        {customer ? (
+          <>
+            <Link to="/mina-sidor" className="text-slate-300 hover:text-emerald-400 transition-colors">
+              Mina sidor
+            </Link>
+            <button onClick={handleCustomerLogout} className="text-slate-300 hover:text-emerald-400 transition-colors">
+              Logga ut
+            </button>
+          </>
+        ) : (
+          <Link to="/login" className="text-slate-300 hover:text-emerald-400 transition-colors">
+            Logga in
+          </Link>
+        )}
 
         {isAdmin ? (
           <>
