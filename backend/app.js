@@ -1,3 +1,5 @@
+import googleAuthRouter from './routes/googleAuth.js'
+import customerRouter from './routes/customer.js'
 import shippingRouter from './routes/shipping.js'
 import webhooksRouter from './routes/webhooks.js'
 import checkoutRouter from './routes/checkout.js'
@@ -55,10 +57,11 @@ app.use('/auth', authRouter)
 app.use('/products', productsRouter)
 app.use('/orders', ordersRouter)
 app.use('/api/search', searchRouter)
-app.use('/api/search', searchRouter)
 app.use('/admin', requireAdmin, adminImportRouter)
 app.use('/admin', requireAdmin, adminSearchRouter)
 app.use('/admin', requireAdmin, adminProductImagesRouter)
+app.use('/auth/google', googleAuthRouter)
+app.use('/customer', customerRouter)
 app.use('/api/checkout', checkoutRouter)
 app.use('/api/shipping', shippingRouter)
 
