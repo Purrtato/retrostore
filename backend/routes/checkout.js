@@ -75,17 +75,18 @@ router.post('/', async (req, res) => {
       ? `${servicePoint.street}, ${servicePoint.postalCode} ${servicePoint.city}`
       : null
 
-    const orderResult = await client.query(
+      const orderResult = await client.query(
       `INSERT INTO orders
          (customer_name, customer_email, status, total,
           shipping_option, shipping_price, shipping_postal_code,
-          service_point_id, service_point_name, service_point_address)
-       VALUES ($1, $2, 'Obetald', $3, $4, $5, $6, $7, $8, $9)
+          service_point_id, service_point_name, service_point_address, customer_id)
+       VALUES ($1, $2, 'Obetald', $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING id`,
       [
         customer_name, customer_email, totalOre / 100,
         shipping_option, shippingOre / 100, postal_code,
-        servicePoint?.id ?? null, servicePoint?.name ?? null, servicePointAddress
+        servicePoint?.id ?? null, servicePoint?.name ?? null, servicePointAddress,
+        req.session?.customerId ?? null // null för gäster
       ]
     )
     orderId = orderResult.rows[0].id

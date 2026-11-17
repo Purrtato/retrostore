@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { api } from '../api'
+import { useCustomer } from '../context/CustomerContext'
 
 function formatEstimate(estimate) {
   if (!estimate) return null
@@ -25,8 +26,12 @@ function formatDistance(meters) {
 function Checkout() {
   const { cart, notices, refreshStock } = useCart()
 
-  const [customerName, setCustomerName] = useState('')
-  const [customerEmail, setCustomerEmail] = useState('')
+  const { customer } = useCustomer()
+  const [nameInput, setNameInput] = useState(null)   // null, kunden har inte skrivit något själv
+  const [emailInput, setEmailInput] = useState(null)
+    // Inloggad kund: uppgifterna är förifyllda, men går att ändra
+  const customerName = nameInput ?? customer?.name ?? ''
+  const customerEmail = emailInput ?? customer?.email ?? ''
   const [postalCode, setPostalCode] = useState('')
   const [shippingOption, setShippingOption] = useState('pickup') // 'pickup' (ombud) eller 'home' (hemleverans)
   const [servicePointId, setServicePointId] = useState('')
@@ -164,11 +169,16 @@ function Checkout() {
             {notices.map(notice => (
               <p key={notice} className="text-amber-400 mb-3">{notice}</p>
             ))}
+            {customer ? (
+              <p className="text-sm text-slate-400 mb-3">Du handlar som {customer.email}. Ordern sparas under Mina sidor.</p>
+            ) : (
+              <p className="text-sm text-slate-400 mb-3">Logga in för att se din order under Mina sidor.</p>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <input
                 type="text"
                 value={customerName}
-                onChange={e => setCustomerName(e.target.value)}
+                onChange={e => setNameInput(e.target.value)}
                 placeholder="Namn"
                 className={inputClass}
                 required
@@ -176,7 +186,7 @@ function Checkout() {
               <input
                 type="email"
                 value={customerEmail}
-                onChange={e => setCustomerEmail(e.target.value)}
+                onChange={e => setEmailInput(e.target.value)}
                 placeholder="E-post"
                 className={inputClass}
                 required

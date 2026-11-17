@@ -9,6 +9,8 @@ import AdminOrders from './pages/AdminOrders'
 import AdminLogin from './pages/AdminLogin'
 import ProtectedRoute from './components/ProtectedRoute'
 import Search from './pages/Search'
+import Login from './pages/Login'
+import MyPages from './pages/MyPages'
 
 function App() {
   return (
@@ -20,6 +22,8 @@ function App() {
         <Route path="/cart" element={<Cart />} />
         <Route path="/search" element={<Search />} />
         <Route path="/checkout" element={<Checkout />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/mina-sidor" element={<MyPages />} />
         <Route path="/order-confirmation" element={<OrderConfirmation />} />
 
         {/* Inloggningssidan är öppen, annars kommer ingen in */}
