@@ -15,7 +15,9 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
     return res.status(status).json({ error: 'Ogiltig webhook' })
   }
 
-  // Uppdatera ordern. Misslyckas det svarar den 500, och Stripe försöker igen senare
+  console.log(`Stripe-webhook mottagen: ${event.kind}${event.orderId ? ` (order ${event.orderId})` : ''}`)
+
+  // Uppdatera ordern. Misslyckas det svarar vi 500, och Stripe försöker igen senare.
   try {
     if (event.kind === 'paid') await markOrderPaid(event.orderId)
     if (event.kind === 'expired') await markOrderCancelled(event.orderId)
@@ -24,11 +26,15 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
     return res.status(500).json({ error: 'Kunde inte behandla händelsen' })
   }
 
-  // Skicka orderbekräftelsen, efter att ordern är markerad som betald
+  // Skicka orderbekräftelsen efter att ordern är markerad som betald.
   if (event.kind === 'paid') {
     try {
       const result = await sendOrderConfirmation(event.orderId)
-      if (result.sent) console.log(`Orderbekräftelse skickad för order ${event.orderId}`)
+      console.log(
+        result.sent
+          ? `Orderbekräftelse skickad för order ${event.orderId}`
+          : `Ingen orderbekräftelse skickades för order ${event.orderId} (ordern saknas eller är inte betald)`
+      )
     } catch (err) {
       console.error(`Kunde inte skicka orderbekräftelse för order ${event.orderId}:`, err.message)
     }
