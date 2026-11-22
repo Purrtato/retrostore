@@ -36,6 +36,8 @@ Alla tjänster används bara i testläge eller med gratiskonton. Nycklarna ligge
 | Stripe (testläge) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` |
 | PostNord (sandlåda) | `POSTNORD_API_KEY`, `POSTNORD_BASE_URL`, `SHOP_POSTAL_CODE` |
 | Admininloggning | `SESSION_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `CLIENT_URL` |
+| Google (inloggning) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` |
+| Resend (e-post) | `RESEND_API_KEY`, `EMAIL_FROM` |
 
 **Admin:** logga in på `/admin/login`. Läraren får kontot i inlämningskommentaren (aldrig i repot). Lokalt väljer du själv `ADMIN_USERNAME` och `ADMIN_PASSWORD` i `.env`.
 
@@ -47,6 +49,8 @@ Alla tjänster används bara i testläge eller med gratiskonton. Nycklarna ligge
 - **Deployad webhook:** i Stripe Dashboard finns en webhook-endpoint till `https://e-handel-kunskapskontroll.onrender.com/webhooks/stripe` med händelserna `checkout.session.completed` och `checkout.session.expired`. Endpointens signing secret ligger som `STRIPE_WEBHOOK_SECRET` på Render.
 - **PostNord-sandlådan** har bara testdata för vissa postnummer. Postnumret `11153` fungerar.
 - **Sökindexet** fylls med knappen "Synka sökindex" på adminsidan (och uppdateras sedan automatiskt).
+- **Google-inloggning:** skapa en OAuth-klient av typen Web application i Google Cloud Console. Lägg till `http://localhost:3000/auth/google/callback` och `https://e-handel-kunskapskontroll.onrender.com/auth/google/callback` som Authorized redirect URIs. `GOOGLE_REDIRECT_URI` måste vara identisk med den adress som används (olika värden lokalt och på Render). Appen ber bara om `openid email profile`. Hur läraren kommer in med sitt Google-konto beskrivs i inlämningskommentaren.
+- **E-post:** utan egen domän skickar Resend från `onboarding@resend.dev`, som bara kan skicka till e-postadressen på det Resend-konto som äger nyckeln. Testa med den adressen.
 - **Databasen:** förutom grundtabellerna (`products`, `orders`, `order_items`) behövs dessa tillägg:
 
 ```sql
@@ -65,13 +69,24 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_postal_code text;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS service_point_id text;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS service_point_name text;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS service_point_address text;
+
+CREATE TABLE IF NOT EXISTS customers (
+  id serial PRIMARY KEY,
+  google_sub text NOT NULL UNIQUE,
+  email text NOT NULL,
+  name text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id integer REFERENCES customers(id);
+CREATE INDEX IF NOT EXISTS orders_customer_id_idx ON orders (customer_id);
 ```
 
 Tabellen för inloggningssessioner (`session`) skapas automatiskt av servern.
 
 ### Så är koden uppdelad
 
-`backend/integrations/` har en adapter per extern tjänst (leverantör, Algolia, Stripe, Supabase Storage, PostNord). Adaptrarna hanterar sådant som URL:er, nycklar, format och felkoder, och returnerar data i ett format som passar shoppen. `services/` innehåller logiken, `routes/` HTTP-endpoints och `config/` shoppens fraktprislista.
+`backend/integrations/` har en adapter per extern tjänst (leverantör, Algolia, Stripe, Supabase Storage, PostNord, Google, Resend). Adaptrarna hanterar sådant som URL:er, nycklar, format och felkoder, och returnerar data i ett format som passar shoppen. `services/` innehåller logiken, `routes/` HTTP-endpoints och `config/` shoppens fraktprislista.
 
 ## Så gjorde jag varje labb
 
@@ -106,6 +121,16 @@ När en bild byts ut sparas den nya bilden först. Den gamla tas bort efteråt, 
 I kassan kan kunden ange sitt postnummer och se vilka ombud och leveranstider PostNord erbjuder. Kunden kan sedan välja mellan ombud och hemleverans.
 
 Jag har lagt fraktpriserna i en egen prislista i shoppen: 59 kr, 99 kr eller gratis frakt vid köp över 500 kr. Servern räknar ut frakten och skickar med den som en egen rad i Stripe-betalningen. Den kontrollerar också att ombudet kunden väljer faktiskt finns för det angivna postnumret.
+
+**Labb 6 – Kundinloggning med Google**
+
+Kunder loggar in med sitt Google-konto via OAuth 2.0 och OpenID Connect. Allt sker via min server, och Googles tokens når aldrig webbläsaren. Kunden identifieras med Googles `sub`, inte med e-postadressen, och skapas i tabellen `customers` första gången hen loggar in. Under Mina sidor ser kunden sina egna beställningar. En order som läggs inloggad kopplas till kunden via sessionen på servern (React skickar aldrig något kund-id), och `GET /customer/orders` svarar 401 utan inloggning. Avbruten inloggning och fel från Google ger ett begripligt meddelande på inloggningssidan.
+
+**Labb 8 – Orderbekräftelse via e-post**
+
+När Stripe-webhooken har markerat en order som betald skickar shoppen en orderbekräftelse via Resend. Adaptern (`integrations/emailAdapter.js`) är den enda filen som känner till Resends adress och nyckel, och anropet har en timeout. Mejlet har ordernummer i ämnesraden, kundens namn, produkterna med antal och pris, frakten och totalsumman, både som html och text. Allt som kommer från kunden (namnet) och produktnamnen escapas innan de hamnar i html:en. Varje mejl har en `Idempotency-Key` knuten till ordern (`order-confirmation/<orderns id>`), så att samma webhook två gånger ändå ger ett mejl. Ett misslyckat mejl stoppar inte ordern: felet loggas, ordern är redan betald, och webhooken svarar fortfarande 200. Resends svar valideras med Zod.
+
+Begränsningar: utan egen domän kan mejlet bara skickas till adressen på mitt Resend-konto. Resend sparar idempotensnycklar i 24 timmar, så om samma webhook skulle skickas igen efter mer än ett dygn kan ett nytt mejl skickas. Använder man samma nyckel med ett annat innehåll avvisar Resend anropet (409), men eftersom mejlet byggs från ordern i databasen blir innehållet detsamma vid ett omskick.
 
 ### Hur jag använde AI (Labb 5)
 
@@ -182,3 +207,48 @@ Det är smidigt att använda färdiga tjänster, men det innebär också att jag
 - **Algolia och Supabase:** Gratiskonton har begränsningar, och om shoppen växer kan tjänsterna börja kosta pengar.
 
 Om en tjänst skulle läggas ner, ändra sitt API eller bli för dyr skulle jag behöva hitta en annan lösning. Därför har jag lagt varje integration bakom en egen adapter. Det gör att jag kan samla ändringarna på ett ställe i stället för att behöva ändra kod på flera olika ställen i projektet.
+
+## 3. Så fungerar autentiseringen
+
+Shoppen har två sorters inloggning. **Admin** loggar in med användarnamn och lösenord (från Inlämningsuppgift 1): uppgifterna ligger som miljövariabler på servern och jämförs på ett sätt som inte läcker information via svarstiden. **Kunder** loggar in med Google. Båda använder en server-sparad session. Labb 7 (GitHub-inloggning och issues, VG) har jag inte gjort.
+
+### Inloggningsflödet med Google
+
+1. Kunden klickar på "Logga in med Google". Det är en vanlig länk till min server (`/auth/google/start`), inte ett anrop från React.
+2. Servern skapar tre slumpmässiga engångsvärden: `state`, `nonce` och en `code_verifier`. De sparas i kundens session på servern och skickas aldrig till webbläsaren. Kunden skickas vidare till Google med `scope=openid email profile` (det minsta jag behöver), `state`, `nonce` och en `code_challenge`, som är en hash av `code_verifier`.
+3. Kunden loggar in hos Google och godkänner att shoppen får se namn och e-post.
+4. Google skickar tillbaka kunden till min callback (`/auth/google/callback`) med en engångskod (`code`) och `state`.
+5. Servern kontrollerar att `state` stämmer med det som sparades, och att inloggningen inte är äldre än tio minuter. Stämmer det inte avvisas inloggningen. Engångsvärdena tas bort ur sessionen oavsett resultat, så de kan aldrig användas två gånger.
+6. Servern byter koden mot tokens i ett anrop direkt till Google, med min client secret och `code_verifier`.
+7. Servern verifierar ID-token: signaturen mot Googles publika nycklar, att den är utfärdad av Google (`iss`), till min app (`aud`) och inte har gått ut (`exp`), samt att `nonce` stämmer. Innehållet valideras med Zod, och e-postadressen måste vara verifierad av Google.
+8. Kunden hittas via Googles `sub`, eller skapas om det är första gången. Jag använder aldrig e-postadressen för att känna igen kunden, eftersom den kan ändras och återanvändas.
+9. Servern skapar en ny session med ett nytt sessions-id (skydd mot session fixation), sparar kundens id i den och skickar kunden till Mina sidor. React frågar sedan servern vem som är inloggad (`/customer/me`).
+
+Avbruten inloggning, fel från Google, ett `state` som inte stämmer och en ogiltig ID-token skickar tillbaka kunden till inloggningssidan med en felkod, som React översätter till ett begripligt meddelande. Anropen till Google har timeout, så om Google inte svarar får kunden ett meddelande i stället för en kraschad sida.
+
+### Vad state, PKCE och nonce skyddar mot
+
+Jag använder alla tre, eftersom de skyddar mot olika saker:
+
+- **state** skyddar mot att någon lurar kunden att slutföra en inloggning som någon annan har startat (CSRF mot callbacken). Servern avvisar ett svar som inte matchar det som sparades när kunden började.
+- **PKCE** skyddar mot att en stulen `code` kan användas. Koden går bara att byta mot tokens tillsammans med `code_verifier`, som aldrig lämnar min server. Det är ett extra skydd utöver min client secret.
+- **nonce** binder ID-token till just den här inloggningen, så att en gammal eller inskickad token inte kan återanvändas.
+
+### Tokens
+
+- **Authorization code:** en engångskod som syns i adressfältet när Google skickar tillbaka kunden. Den är värdelös utan min client secret och `code_verifier`.
+- **ID-token (JWT):** innehåller kundens `sub`, e-post och namn. Den gäller ungefär en timme, används en enda gång för att identifiera kunden, och sparas inte.
+- **Access-token:** Google skickar den också, men jag använder den inte och sparar den inte. Jag ber inte heller om någon refresh-token.
+- **Shoppens session-cookie** (`connect.sid`): det enda som når webbläsaren. Den innehåller ett sessions-id som är signerat med `SESSION_SECRET`, är `httpOnly` (JavaScript kommer inte åt den) och `secure` i produktion, och gäller i åtta timmar. Själva sessionen ligger i databasen (tabellen `session`).
+
+### Session eller JWT
+
+Jag valde **session**. Skälen är att jag redan hade en Postgres-lagrad session för admin, att en session går att spärra direkt på servern (jag raderar den), och att ingenting läsbart ligger i webbläsaren, bara ett signerat id. En JWT hade gått att läsa av klienten och går inte att dra tillbaka före utgångstiden utan en spärrlista. Nackdelen med session är att servern måste slå upp sessionen i databasen vid varje anrop, och att lagringen måste delas om servern skulle skalas upp. En JWT passar bättre när flera tjänster ska verifiera användaren utan en gemensam databas.
+
+Eftersom frontend (Vercel) och backend (Render) ligger på olika domäner sätter jag cookien med `SameSite=None; Secure` och tillåter cookies i CORS-inställningen. Det fungerar, men cookien räknas då som en tredjepartscookie när React anropar servern. Vissa webbläsare, till exempel Safari, blockerar sådana cookies som standard, och då skulle kunden se utloggad ut. Om båda låg under samma domän (till exempel genom att Vercel vidarebefordrar anrop till backend) skulle problemet försvinna.
+
+### Konton, utloggning och val jag har gjort
+
+- **Konton:** shoppen har ingen lösenordsinloggning för kunder, bara för admin, och den är helt separat (miljövariabler, inte tabellen `customers`). Därför kan en kunds e-postadress inte krocka med ett lösenordskonto. Om två olika Google-konton skulle ha samma e-postadress får de olika `sub` och blir två separata kunder. Jag slår aldrig ihop konton på e-post, eftersom det skulle kunna låta någon ta över ett annat konto.
+- **Utloggning:** utloggningen tar bort kunden ur shoppens session, men kunden är fortfarande inloggad hos Google, så en ny inloggning går snabbt (Google frågar inte igen, eftersom kunden redan har godkänt appen).
+- **Skydd:** Mina sidor är skyddade på servern (`GET /customer/orders` svarar 401 utan inloggning), och servern hämtar bara de beställningar som hör till kunden i sessionen, så ingen kan se någon annans order. En order som görs inloggad kopplas till kunden via sessionen på servern, och React skickar aldrig något kund-id.
